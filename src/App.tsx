@@ -16,6 +16,7 @@ function App() {
             <Route path="/add" element={<NotePage />} />
             <Route path="/note/:id" element={<NotePage />} />
             <Route path="/edit/:id" element={<NotePage />} />
+            <Route path="/testing-path" element={<Home />} />
           </Routes>
         </BrowserRouter>
       </NotesProvider>
