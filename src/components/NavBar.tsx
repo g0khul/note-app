@@ -1,15 +1,18 @@
 import { Link, NavLink } from "react-router-dom";
+import { FaStickyNote, FaSun, FaMoon } from "react-icons/fa";
+import { useTheme } from "../context/ThemeContext";
 
 function Navbar() {
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav className="navbar navbar-expand-lg">
       <div className="container">
-        {/* Left: Logo / Brand */}
-        <Link className="navbar-brand fw-bold" to="/">
-          📝 Notes App
+        <Link className="navbar-brand fw-bold d-flex align-items-center gap-2" to="/">
+          <FaStickyNote />
+          Notes App
         </Link>
 
-        {/* Toggle for mobile */}
         <button
           className="navbar-toggler"
           type="button"
@@ -22,12 +25,11 @@ function Navbar() {
           <span className="navbar-toggler-icon"></span>
         </button>
 
-        {/* Right: Nav links */}
         <div
           className="collapse navbar-collapse justify-content-end"
           id="navbarNav"
         >
-          <ul className="navbar-nav">
+          <ul className="navbar-nav align-items-center gap-2">
             <li className="nav-item">
               <NavLink className="nav-link" to="/">
                 Home
@@ -37,6 +39,15 @@ function Navbar() {
               <NavLink className="nav-link" to="/add">
                 Add Note
               </NavLink>
+            </li>
+            <li className="nav-item">
+              <button
+                className="btn btn-link nav-link"
+                onClick={toggleTheme}
+                aria-label="Toggle theme"
+              >
+                {theme === "light" ? <FaMoon /> : <FaSun />}
+              </button>
             </li>
           </ul>
         </div>

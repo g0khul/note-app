@@ -1,51 +1,53 @@
+import { useState } from "react";
 import NoteCard from "../components/NoteCard";
+import { useNotes } from "../context/NotesContext";
 
 function Home() {
-  const notes = [
-    {
-      id: 1,
-      title: "Learn React",
-      content: "Understand components, props, and state deeply.",
-      createdAt: "2025-10-20",
-    },
-    {
-      id: 2,
-      title: "Practice TypeScript",
-      content: "Work with interfaces and generics in a React context.",
-      createdAt: "2025-10-21",
-    },
-    {
-      id: 3,
-      title: "Setup Bootstrap",
-      content: "Integrate Bootstrap styles in a React + TS app.",
-      createdAt: "2025-10-22",
-    },
-    {
-      id: 4,
-      title: "Build Todo App",
-      content: "Implement CRUD with mock API and routing.",
-      createdAt: "2025-10-23",
-    },
-    {
-      id: 5,
-      title: "Polish UI",
-      content: "Add responsiveness and better UX.",
-      createdAt: "2025-10-24",
-    },
-  ];
+  const { notes } = useNotes();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter notes based on search query
+  const filteredNotes = notes.filter((note) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      note.title.toLowerCase().includes(query) ||
+      note.subheading.toLowerCase().includes(query) ||
+      note.content.toLowerCase().includes(query)
+    );
+  });
 
   return (
-    <div>
-      <div className="container my-4">
-        <h2 className="mb-3">My Notes</h2>
-        <div className="row">
-          {notes.map((note) => (
-            <div className="col-md-4 mb-3" key={note.id}>
+    <div className="container my-4">
+      <h2 className="mb-4">My Notes</h2>
+
+      {/* Search bar */}
+      <div className="mb-4">
+        <input
+          type="text"
+          className="form-control"
+          placeholder="Search notes by title, subheading, or content..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {notes.length === 0 ? (
+        <div className="alert alert-info" role="alert">
+          No notes yet. Click "Add Note" to create your first note!
+        </div>
+      ) : filteredNotes.length === 0 ? (
+        <div className="alert alert-warning" role="alert">
+          No notes found matching "{searchQuery}". Try a different search term.
+        </div>
+      ) : (
+        <div className="row g-3">
+          {filteredNotes.map((note) => (
+            <div className="col-12 col-md-6 col-lg-4" key={note.id}>
               <NoteCard note={note} />
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }
