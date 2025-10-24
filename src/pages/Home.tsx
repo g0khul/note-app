@@ -3,7 +3,7 @@ import NoteCard from "../components/NoteCard";
 import { useNotes } from "../context/NotesContext";
 
 function Home() {
-  const { notes } = useNotes();
+  const { notes, loading } = useNotes();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter notes based on search query
@@ -31,7 +31,13 @@ function Home() {
         />
       </div>
 
-      {notes.length === 0 ? (
+      {loading ? (
+        <div className="text-center my-5">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      ) : notes.length === 0 ? (
         <div className="alert alert-info" role="alert">
           No notes yet. Click "Add Note" to create your first note!
         </div>

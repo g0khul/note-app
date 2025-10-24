@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
+import { notesService } from "../services/notesService";
 
 export interface Note {
   id: number;
@@ -11,52 +12,69 @@ export interface Note {
 
 interface NotesContextType {
   notes: Note[];
-  addNote: (note: Omit<Note, "id">) => void;
+  loading: boolean;
+  error: string | null;
+  addNote: (note: Omit<Note, "id">) => Promise<void>;
   deleteNote: (id: number) => void;
-  updateNote: (id: number, note: Omit<Note, "id">) => void;
+  updateNote: (id: number, note: Omit<Note, "id">) => Promise<void>;
   getNote: (id: number) => Note | undefined;
 }
 
 const NotesContext = createContext<NotesContextType | undefined>(undefined);
 
 export function NotesProvider({ children }: { children: ReactNode }) {
-  const [notes, setNotes] = useState<Note[]>([
-    {
-      id: 1,
-      title: "Learn React",
-      subheading: "Frontend Development",
-      content: "Understand components, props, and state deeply.",
-    },
-    {
-      id: 2,
-      title: "Practice TypeScript",
-      subheading: "Programming Language",
-      content: "Work with interfaces and generics in a React context.",
-    },
-    {
-      id: 3,
-      title: "Setup Bootstrap",
-      subheading: "CSS Framework",
-      content: "Integrate Bootstrap styles in a React + TS app.",
-    },
-  ]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const addNote = (note: Omit<Note, "id">) => {
+  // Fetch notes from API on mount
+  useEffect(() => {
+    const fetchNotes = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const fetchedNotes = await notesService.getAllNotes();
+        setNotes(fetchedNotes);
+      } catch (err) {
+        setError("Failed to load notes. Please try again later.");
+        console.error("Error loading notes:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotes();
+  }, []);
+
+  const addNote = async (note: Omit<Note, "id">) => {
     const newNote: Note = {
       ...note,
       id: Date.now(),
     };
-    setNotes([newNote, ...notes]);
+
+    try {
+      await notesService.addNote(newNote);
+      setNotes([newNote, ...notes]);
+    } catch (error) {
+      console.error("Failed to add note:", error);
+      throw error;
+    }
   };
 
   const deleteNote = (id: number) => {
     setNotes(notes.filter((note) => note.id !== id));
   };
 
-  const updateNote = (id: number, updatedNote: Omit<Note, "id">) => {
-    setNotes(
-      notes.map((note) => (note.id === id ? { ...updatedNote, id } : note))
-    );
+  const updateNote = async (id: number, updatedNote: Omit<Note, "id">) => {
+    try {
+      await notesService.updateNote(id, updatedNote);
+      setNotes(
+        notes.map((note) => (note.id === id ? { ...updatedNote, id } : note))
+      );
+    } catch (error) {
+      console.error("Failed to update note:", error);
+      throw error;
+    }
   };
 
   const getNote = (id: number) => {
@@ -65,7 +83,15 @@ export function NotesProvider({ children }: { children: ReactNode }) {
 
   return (
     <NotesContext.Provider
-      value={{ notes, addNote, deleteNote, updateNote, getNote }}
+      value={{
+        notes,
+        loading,
+        error,
+        addNote,
+        deleteNote,
+        updateNote,
+        getNote,
+      }}
     >
       {children}
     </NotesContext.Provider>
