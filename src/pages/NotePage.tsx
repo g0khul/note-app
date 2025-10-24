@@ -5,48 +5,12 @@ import { FaEdit, FaArrowLeft } from "react-icons/fa";
 import { useNotes } from "../context/NotesContext";
 
 function NotePage() {
-  const { id } = useParams();
-  const { getNote, addNote, updateNote } = useNotes();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Determine mode based on URL path
-  const mode = location.pathname.startsWith("/add")
-    ? "add"
-    : location.pathname.includes("/edit/")
-    ? "edit"
-    : "view";
-
-  const [title, setTitle] = useState("");
-  const [subheading, setSubheading] = useState("");
-  const [content, setContent] = useState("");
-
   // Load note data for view/edit modes
-  useEffect(() => {
-    if ((mode === "view" || mode === "edit") && id) {
-      const note = getNote(Number(id));
-      if (note) {
-        setTitle(note.title);
-        setSubheading(note.subheading);
-        setContent(note.content);
-      } else {
-        navigate("/");
-      }
-    }
-  }, [id, mode, getNote, navigate]);
+  useEffect(() => {}, []);
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    if (title.trim() && subheading.trim() && content.trim()) {
-      if (mode === "add") {
-        addNote({ title, subheading, content });
-      } else if (mode === "edit" && id) {
-        updateNote(Number(id), { title, subheading, content });
-      }
-      navigate("/");
-    }
-  };
+  const handleSubmit = () => {};
 
+  const mode = "";
   // View mode - read-only display
   if (mode === "view") {
     return (
@@ -58,23 +22,22 @@ function NotePage() {
                 <div className="d-flex justify-content-between align-items-start mb-3">
                   <button
                     className="btn btn-outline-secondary btn-sm"
-                    onClick={() => navigate("/")}
+                    onClick={() => {}}
                   >
-                    <FaArrowLeft className="me-2" />
-                    Back
+                    {/* FaArrowLeft icon with text here  */}
                   </button>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => navigate(`/edit/${id}`)}
-                  >
-                    <FaEdit className="me-2" />
-                    Edit
+                  <button className="btn btn-primary btn-sm" onClick={() => {}}>
+                    {/* FaEdit icon with text here */}
                   </button>
                 </div>
-                <h1 className="card-title mb-3">{title}</h1>
-                <h5 className="card-subtitle mb-4 text-muted">{subheading}</h5>
+                <h1 className="card-title mb-3">{/* {title text here} */}</h1>
+                <h5 className="card-subtitle mb-4 text-muted">
+                  {/* {subheading text here} */}
+                </h5>
                 <div className="card-text">
-                  <p style={{ whiteSpace: "pre-wrap" }}>{content}</p>
+                  <p style={{ whiteSpace: "pre-wrap" }}>
+                    {/* {content text here} */}
+                  </p>
                 </div>
               </div>
             </div>
@@ -92,19 +55,21 @@ function NotePage() {
           <div className="card shadow">
             <div className="card-body">
               <h2 className="card-title mb-4">
-                {mode === "add" ? "Add New Note" : "Edit Note"}
+                {/* Add or edit mode title here  */}
               </h2>
               <form onSubmit={handleSubmit}>
                 <div className="mb-3">
                   <label htmlFor="title" className="form-label">
-                    Title
+                    {/* Title text here  */}
                   </label>
                   <input
                     type="text"
                     className="form-control"
                     id="title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    // set title value here
+                    value={""}
+                    // onChange event here
+                    onChange={() => {}}
                     required
                   />
                 </div>
@@ -116,8 +81,10 @@ function NotePage() {
                     type="text"
                     className="form-control"
                     id="subheading"
-                    value={subheading}
-                    onChange={(e) => setSubheading(e.target.value)}
+                    // set subheading here
+                    value={""}
+                    // onChange evebt here
+                    onChange={() => {}}
                     required
                   />
                 </div>
@@ -129,21 +96,23 @@ function NotePage() {
                     className="form-control"
                     id="content"
                     rows={5}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
+                    // set content here
+                    value={""}
+                    // onChange event here
+                    onChange={() => {}}
                     required
                   ></textarea>
                 </div>
                 <div className="d-flex gap-2">
                   <button type="submit" className="btn btn-primary">
-                    {mode === "add" ? "Add Note" : "Update Note"}
+                    {/* Add or update note here  */}
                   </button>
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    onClick={() => navigate("/")}
+                    onClick={() => {}}
                   >
-                    Cancel
+                    {/* Cancel text here  */}
                   </button>
                 </div>
               </form>
