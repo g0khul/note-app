@@ -42,14 +42,12 @@ React is a JavaScript library that makes building interactive user interfaces ea
 
 A Notes Application with these features:
 
-- View all notes in a responsive grid
-- Search notes by title, subheading, or content
+- View all notes in a grid
 - Add new notes with title, subheading, and content
 - Edit existing notes
 - Delete notes
 - View individual notes in detail
 - Toggle between dark and light themes
-- **Fetch and save notes using a REST API**
 
 ### Technologies Used
 
@@ -58,8 +56,6 @@ A Notes Application with these features:
 - **React Router**: For navigation between pages
 - **Bootstrap**: CSS framework for styling
 - **Context API**: For global state management
-- **REST API**: For persisting notes data on a server
-- **Fetch API**: For making HTTP requests
 - **Vite**: Build tool (faster than Create React App)
 
 ---
@@ -73,13 +69,13 @@ notes-app/
 │   │   ├── NavBar.tsx     # Navigation bar component
 │   │   └── NoteCard.tsx   # Individual note card component
 │   ├── pages/             # Full page components
-│   │   ├── Home.tsx       # Home page showing all notes with search
-│   │   └── NotePage.tsx   # Unified page for add/edit/view note
+│   │   ├── Home.tsx       # Home page showing all notes
+│   │   ├── AddNote.tsx    # Page to add new note
+│   │   ├── EditNote.tsx   # Page to edit existing note
+│   │   └── ViewNote.tsx   # Page to view single note
 │   ├── context/           # Global state management
-│   │   ├── NotesContext.tsx  # Manages all notes data with API
+│   │   ├── NotesContext.tsx  # Manages all notes data
 │   │   └── ThemeContext.tsx  # Manages dark/light theme
-│   ├── services/          # API service layer
-│   │   └── notesService.ts   # REST API calls for notes
 │   ├── App.tsx            # Root component with routes
 │   └── main.tsx           # Entry point
 ├── package.json           # Project dependencies
@@ -88,10 +84,9 @@ notes-app/
 
 **Why this structure?**
 
-- **Separation of concerns**: Components, pages, services, and state logic are separated
-- **Reusability**: Components and services can be used in multiple places
+- **Separation of concerns**: Components, pages, and state logic are separated
+- **Reusability**: Components can be used in multiple places
 - **Maintainability**: Easy to find and update specific features
-- **Service layer**: API logic is isolated from UI components
 
 ---
 
@@ -185,66 +180,10 @@ setTitle("New Title"); // React re-renders automatically!
 </NotesProvider>;
 
 // Access anywhere deep in the tree
-const { notes, loading } = useNotes(); // No prop drilling!
+const { notes } = useNotes(); // No prop drilling!
 ```
 
 **Why it works**: Context creates a "global" store that any component can access directly.
-
----
-
-### 5. Async/Await and Promises
-
-**Problem**: Fetching data from an API takes time. We can't block the UI while waiting.
-
-**Solution**: Promises and async/await handle asynchronous operations.
-
-```tsx
-// Promise - represents a future value
-fetch("https://api.example.com/notes")
-  .then((response) => response.json())
-  .then((data) => console.log(data));
-
-// Async/await - cleaner syntax for promises
-async function fetchNotes() {
-  const response = await fetch("https://api.example.com/notes");
-  const data = await response.json();
-  console.log(data);
-}
-```
-
-**Why we need it**:
-
-- Network requests take time (100ms - several seconds)
-- JavaScript is single-threaded - can't freeze while waiting
-- Async allows code to continue running while waiting for responses
-
----
-
-### 6. REST API
-
-**Problem**: Apps need to store data permanently and share it across devices.
-
-**Solution**: REST APIs provide a server to store and retrieve data over HTTP.
-
-**HTTP Methods**:
-
-- **GET**: Retrieve data (e.g., get all notes)
-- **POST**: Create new data (e.g., add a note)
-- **PUT**: Update existing data (e.g., edit a note)
-- **DELETE**: Remove data (e.g., delete a note)
-
-```tsx
-// GET request - fetch notes
-const response = await fetch("https://api.example.com/notes");
-const notes = await response.json();
-
-// POST request - create note
-const response = await fetch("https://api.example.com/notes", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ title: "New Note", content: "..." }),
-});
-```
 
 ---
 
@@ -349,216 +288,51 @@ createRoot(document.getElementById("root")!).render(
 
 ---
 
-## Part 2: REST API Service (notesService.ts)
+## Part 2: Context for Notes Management (NotesContext.tsx)
 
 ### The Problem
 
-We need to:
+Multiple components (Home, AddNote, EditNote, ViewNote) need to:
 
-- Fetch notes from a server (not just store in memory)
-- Create new notes on the server
-- Update existing notes on the server
-- Handle errors and different response formats
-
-### The Solution: Create a Service Layer
-
-```tsx
-import type { Note } from "../context/NotesContext";
-
-const API_BASE_URL = "https://notes-app.free.beeceptor.com";
-
-export const notesService = {
-  getAllNotes: async (): Promise<Note[]> => { ... },
-  addNote: async (note: Note): Promise<Note> => { ... },
-  updateNote: async (id: number, note: Omit<Note, "id">): Promise<Note> => { ... }
-};
-```
-
-**Why a service layer?**
-
-- **Separation**: API logic separate from UI components
-- **Reusability**: Any component can use these functions
-- **Maintainability**: Change API endpoints in one place
-- **Type safety**: TypeScript ensures correct data types
-
-### Fetch All Notes
-
-```tsx
-getAllNotes: async (): Promise<Note[]> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/all-notes`);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    // Extract data from API response format: { message: "...", data: [...] }
-    if (
-      result &&
-      typeof result === "object" &&
-      "data" in result &&
-      Array.isArray(result.data)
-    ) {
-      return result.data;
-    }
-
-    // Fallback: return empty array if format is unexpected
-    return [];
-  } catch (error) {
-    console.error("Error fetching notes:", error);
-    throw error;
-  }
-};
-```
-
-**Line by line**:
-
-1. **Function signature**: `async (): Promise<Note[]>`
-
-   - **`async`**: This function performs asynchronous operations
-   - **`Promise<Note[]>`**: Returns a promise that resolves to an array of Notes
-   - **Why**: API calls take time, can't return immediately
-
-2. **Fetch request**: `const response = await fetch(\`${API_BASE_URL}/all-notes\`)`
-
-   - **`fetch()`**: Browser API for making HTTP requests
-   - **`await`**: Wait for the promise to resolve before continuing
-   - **Template literal**: Inserts API_BASE_URL into string
-   - **Result**: Response object with status, headers, and body
-
-3. **Error checking**: `if (!response.ok)`
-
-   - **Problem**: Server might return error status (404, 500, etc.)
-   - **`response.ok`**: True if status is 200-299
-   - **Solution**: Throw error if request failed
-
-4. **Parse JSON**: `const result = await response.json()`
-
-   - **Problem**: Response body is text, we need JavaScript object
-   - **`.json()`**: Parses JSON string into JavaScript object
-   - **`await`**: Parsing is async, wait for it to complete
-
-5. **Data extraction**: Check if response has expected format
-
-   - **Problem**: API might return different formats
-   - **Solution**: Safely extract data array from response
-   - **Fallback**: Return empty array if format unexpected
-
-6. **Error handling**: `try/catch`
-   - **Problem**: Network errors, parsing errors, etc.
-   - **Solution**: Catch errors, log them, and re-throw
-   - **Why re-throw**: Let calling code handle the error
-
-### Add Note
-
-```tsx
-addNote: async (note: Note): Promise<Note> => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/add-note`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(note),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result?.data || note;
-  } catch (error) {
-    console.error("Error adding note:", error);
-    throw error;
-  }
-};
-```
-
-**New concepts**:
-
-1. **POST method**: `method: "POST"`
-
-   - **Problem**: Default fetch is GET (read only)
-   - **Solution**: Specify POST to create data
-   - **HTTP method**: Tells server we're creating something
-
-2. **Headers**: `headers: { "Content-Type": "application/json" }`
-
-   - **Problem**: Server needs to know data format
-   - **Content-Type**: Tells server body is JSON
-   - **Why**: Server parses request correctly
-
-3. **Request body**: `body: JSON.stringify(note)`
-   - **Problem**: Need to send note data to server
-   - **`JSON.stringify()`**: Converts JavaScript object to JSON string
-   - **Why**: HTTP requests send text, not objects
-
-### Update Note
-
-```tsx
-updateNote: async (id: number, note: Omit<Note, "id">): Promise<Note> => {
-  const updatedNote: Note = { ...note, id };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/update-note`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(updatedNote),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result?.data || updatedNote;
-  } catch (error) {
-    console.error("Error updating note:", error);
-    throw error;
-  }
-};
-```
-
-**Differences from addNote**:
-
-- **PUT method**: For updating existing resources
-- **Combines data**: Merges note data with ID
-- **Same pattern**: Headers, body, error handling identical
-
----
-
-## Part 3: Context for Notes Management (NotesContext.tsx)
-
-### The Problem
-
-Multiple components need to:
-
-- Access the list of notes from API
-- Know when notes are loading
-- Add new notes via API
+- Access the list of notes
+- Add new notes
 - Delete notes
-- Update existing notes via API
+- Update existing notes
 
-Without context, we'd have to pass these functions and data through many component levels.
+Without context, we'd have to pass these functions through many component levels.
 
-### The Solution: Create a Context with API Integration
+### The Solution: Create a Context
 
 ```tsx
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState } from "react";
 import type { ReactNode } from "react";
-import { notesService } from "../services/notesService";
 ```
 
-**New imports**:
+**Line 1: ESLint Disable Comment**
 
-- **`useEffect`**: Run side effects (like API calls) after render
-- **`notesService`**: Our API service layer
+```tsx
+/* eslint-disable react-refresh/only-export-components */
+```
+
+- **Problem**: ESLint complains when context files export both components and hooks
+- **What it does**: Disables this specific rule for this file
+- **Why we need it**: Context files conventionally export both Provider and hook - this is normal
+
+**Line 2-3: Imports**
+
+```tsx
+import { createContext, useContext, useState } from "react";
+import type { ReactNode } from "react";
+```
+
+- **Problem**: We need React features to create context and manage state
+- **What they do**:
+  - `createContext` - Creates a new context
+  - `useContext` - Hook to access context values
+  - `useState` - Hook to manage state
+  - `type ReactNode` - TypeScript type for any valid React content (components, strings, etc.)
+- **Why separate import**: `ReactNode` is only used for types, not runtime code
 
 ### Define the Note Type
 
@@ -573,173 +347,105 @@ export interface Note {
 
 - **Problem**: TypeScript needs to know what properties a note has
 - **What it does**: Defines the shape of a note object
-- **Why we need it**: Type safety, auto-completion, clear documentation
+- **Why we need it**:
+  - Type safety - prevents typos (can't write `note.titel`)
+  - Auto-completion in your editor
+  - Clear documentation of data structure
 
 ### Define Context Type
 
 ```tsx
 interface NotesContextType {
   notes: Note[];
-  loading: boolean;
-  error: string | null;
-  addNote: (note: Omit<Note, "id">) => Promise<void>;
+  addNote: (note: Omit<Note, "id">) => void;
   deleteNote: (id: number) => void;
-  updateNote: (id: number, note: Omit<Note, "id">) => Promise<void>;
+  updateNote: (id: number, note: Omit<Note, "id">) => void;
   getNote: (id: number) => Note | undefined;
 }
 ```
 
-**New properties**:
+- **Problem**: TypeScript needs to know what values/functions the context provides
+- **What each property does**:
+  - `notes: Note[]` - Array of all notes
+  - `addNote` - Function to add a new note (doesn't need id, we'll generate it)
+  - `deleteNote` - Function to remove a note by id
+  - `updateNote` - Function to update existing note
+  - `getNote` - Function to find a note by id
+- **`Omit<Note, "id">`**: TypeScript utility that means "Note without the id property"
+  - Why? When adding/updating, users provide title/subheading/content, but ID is auto-generated
 
-- **`loading: boolean`**: True while fetching from API
-- **`error: string | null`**: Error message if API call fails
-- **`async functions`**: addNote and updateNote return Promises (they're async)
+### Create the Context
+
+```tsx
+const NotesContext = createContext<NotesContextType | undefined>(undefined);
+```
+
+- **Problem**: We need to create the context object
+- **What it does**: Creates a context with type `NotesContextType | undefined`
+- **Why `| undefined`**: Initially there's no value (undefined) until we provide it with Provider
 
 ### Create the Provider Component
 
 ```tsx
 export function NotesProvider({ children }: { children: ReactNode }) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
 ```
 
-**State variables**:
+- **Problem**: We need a component to wrap our app and provide the context value
+- **What it does**: Creates a component that accepts `children` prop
+- **`children: ReactNode`**: Any valid React content that's wrapped by this provider
 
-- **`notes`**: Array of notes from API (starts empty)
-- **`loading`**: Loading state (starts true, will fetch on mount)
-- **`error`**: Error message (starts null, set if fetch fails)
-
-### Fetch Notes on Component Mount
+**Initialize State**
 
 ```tsx
-useEffect(() => {
-  const fetchNotes = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const fetchedNotes = await notesService.getAllNotes();
-      setNotes(fetchedNotes);
-    } catch (err) {
-      setError("Failed to load notes. Please try again later.");
-      console.error("Error loading notes:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchNotes();
-}, []);
+const [notes, setNotes] = useState<Note[]>([
+  {
+    id: 1,
+    title: "Learn React",
+    subheading: "Frontend Development",
+    content: "Understand components, props, and state deeply.",
+  },
+  // ... more initial notes
+]);
 ```
 
-**Breaking it down**:
+- **Problem**: We need to store the notes data somewhere
+- **What it does**: Creates state variable `notes` with initial sample data
+- **`useState<Note[]>`**: TypeScript knows this is an array of Note objects
+- **Why initial data**: Gives students something to see immediately when they run the app
 
-1. **`useEffect(() => { ... }, [])`**
-
-   - **Problem**: Need to fetch notes when app first loads
-   - **Solution**: useEffect with empty dependency array runs once on mount
-   - **`[]`**: Empty dependencies = run once, like componentDidMount
-
-2. **Define async function inside useEffect**
-
-   - **Problem**: Can't make useEffect callback async directly
-   - **Solution**: Define async function inside, then call it
-   - **Pattern**: Common React pattern for async effects
-
-3. **Set loading to true**
-
-   - **Problem**: User should see loading indicator
-   - **Solution**: Set loading state before API call
-   - **Result**: Components can show spinner
-
-4. **Clear previous errors**
-
-   - **Problem**: Previous error might still be displayed
-   - **Solution**: Reset error to null before new attempt
-
-5. **Fetch from API**: `const fetchedNotes = await notesService.getAllNotes()`
-
-   - **Problem**: Need data from server
-   - **Solution**: Call service function, wait for result
-   - **`await`**: Pauses until promise resolves
-
-6. **Update state**: `setNotes(fetchedNotes)`
-
-   - **Problem**: UI needs to show fetched notes
-   - **Solution**: Set notes state with API data
-   - **Result**: Components re-render with notes
-
-7. **Error handling**: `catch (err)`
-
-   - **Problem**: API might fail (network issue, server down, etc.)
-   - **Solution**: Catch error, set user-friendly message
-   - **Log**: Console.error for debugging
-
-8. **Finally block**: `setLoading(false)`
-   - **Problem**: Loading should stop whether success or failure
-   - **Solution**: `finally` always runs, even after catch
-   - **Result**: Loading spinner disappears
-
-### Add Note Function (Async)
+**Add Note Function**
 
 ```tsx
-const addNote = async (note: Omit<Note, "id">) => {
+const addNote = (note: Omit<Note, "id">) => {
   const newNote: Note = {
     ...note,
     id: Date.now(),
   };
-
-  try {
-    await notesService.addNote(newNote);
-    setNotes([newNote, ...notes]);
-  } catch (error) {
-    console.error("Failed to add note:", error);
-    throw error;
-  }
+  setNotes([newNote, ...notes]);
 };
 ```
 
-**Changes from old version**:
+**Line by line**:
 
-1. **`async` function**: Returns Promise
+1. **Function signature**: `(note: Omit<Note, "id">)`
 
-   - **Problem**: API call takes time
-   - **Solution**: Make function async
+   - **Problem**: User provides title, subheading, content but not ID
+   - **Solution**: We receive everything except ID
 
-2. **Call API**: `await notesService.addNote(newNote)`
+2. **Create new note**: `const newNote: Note = { ...note, id: Date.now() }`
 
-   - **Problem**: Need to persist note on server
-   - **Solution**: Call API service, wait for success
-   - **Why wait**: Only update UI if server confirms success
+   - **Problem**: We need to add an ID to make it a complete Note
+   - **`...note`**: Spread operator - copies all properties from the input
+   - **`id: Date.now()`**: Generates unique ID using current timestamp
+   - **Why Date.now()**: Simple way to get unique numbers (milliseconds since 1970)
 
-3. **Throw error**
-   - **Problem**: Calling component should know if save failed
-   - **Solution**: Re-throw error so component can handle it
-   - **Use case**: Show error message to user
+3. **Update state**: `setNotes([newNote, ...notes])`
+   - **Problem**: We need to add the new note to our list
+   - **`[newNote, ...notes]`**: Creates new array with new note first, then all old notes
+   - **Why new array**: React requires a new array to detect changes (immutability)
+   - **Why newNote first**: Shows newest notes at the top
 
-### Update Note Function (Async)
-
-```tsx
-const updateNote = async (id: number, updatedNote: Omit<Note, "id">) => {
-  try {
-    await notesService.updateNote(id, updatedNote);
-    setNotes(
-      notes.map((note) => (note.id === id ? { ...updatedNote, id } : note))
-    );
-  } catch (error) {
-    console.error("Failed to update note:", error);
-    throw error;
-  }
-};
-```
-
-**Same pattern as addNote**:
-
-- Call API first
-- Update local state only if API succeeds
-- Throw error if API fails
-
-### Delete Note Function
+**Delete Note Function**
 
 ```tsx
 const deleteNote = (id: number) => {
@@ -747,312 +453,1029 @@ const deleteNote = (id: number) => {
 };
 ```
 
-**Note**: Delete is not async in this implementation
+- **Problem**: User wants to remove a note
+- **What it does**: Creates a new array without the note matching the given ID
+- **`.filter()`**: Array method that keeps only items that pass the test
+- **`note.id !== id`**: Keep all notes EXCEPT the one with this ID
+- **Why it works**: Returns new array without the deleted note, triggering re-render
 
-- Could be extended to call API
-- Currently only updates local state
+**Update Note Function**
 
-### Provide the Context Value
+```tsx
+const updateNote = (id: number, updatedNote: Omit<Note, "id">) => {
+  setNotes(
+    notes.map((note) => (note.id === id ? { ...updatedNote, id } : note))
+  );
+};
+```
+
+- **Problem**: User edited a note, we need to replace the old version
+- **What it does**: Creates new array where one note is replaced
+- **`.map()`**: Transforms each note in the array
+- **Condition**: `note.id === id ? { ...updatedNote, id } : note`
+  - **If IDs match**: Replace with updated content BUT keep the original ID
+  - **If IDs don't match**: Keep the note unchanged
+- **Why it works**: Creates new array with one note updated, React sees the change and re-renders
+
+**Get Note Function**
+
+```tsx
+const getNote = (id: number) => {
+  return notes.find((note) => note.id === id);
+};
+```
+
+- **Problem**: We need to find a specific note by ID (for viewing or editing)
+- **What it does**: Searches array for note with matching ID
+- **`.find()`**: Returns the first item that matches, or `undefined` if not found
+- **Return type**: `Note | undefined` (might not find the note)
+
+**Provide the Context Value**
 
 ```tsx
 return (
   <NotesContext.Provider
-    value={{
-      notes,
-      loading,
-      error,
-      addNote,
-      deleteNote,
-      updateNote,
-      getNote,
-    }}
+    value={{ notes, addNote, deleteNote, updateNote, getNote }}
   >
     {children}
   </NotesContext.Provider>
 );
 ```
 
-**Provided values**:
+- **Problem**: We need to make all these values/functions available to child components
+- **What it does**:
+  - Wraps children with Context Provider
+  - Provides object with all notes data and functions
+- **`{children}`**: Renders whatever was wrapped by this provider
+- **Why this pattern**: Any component inside can now access notes and functions
 
-- **State**: notes, loading, error
-- **Functions**: addNote, deleteNote, updateNote, getNote
+### Create Custom Hook
+
+```tsx
+export function useNotes() {
+  const context = useContext(NotesContext);
+  if (!context) {
+    throw new Error("useNotes must be used within NotesProvider");
+  }
+  return context;
+}
+```
+
+- **Problem**: Components need an easy way to access the context
+- **What it does**:
+  1. Gets the context value using `useContext`
+  2. Checks if context exists
+  3. Returns the context value
+- **Error checking**: If someone uses `useNotes()` outside of `NotesProvider`, they get a clear error
+- **Why we need this**: Better error messages and cleaner code in components
+
+**Usage in components**:
+
+```tsx
+// Instead of this:
+const context = useContext(NotesContext);
+if (!context) throw new Error(...);
+const { notes } = context;
+
+// We can simply write:
+const { notes } = useNotes();
+```
 
 ---
 
-## Part 4: Theme Context (ThemeContext.tsx)
+## Part 3: Theme Context (ThemeContext.tsx)
 
-_[Same as original tutorial - no changes needed]_
+### The Problem
+
+We need to:
+
+- Toggle between dark and light modes
+- Apply the theme across all pages
+- Persist the theme choice (bonus: could add localStorage later)
+
+### The Solution
+
+```tsx
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useEffect } from "react";
+import type { ReactNode } from "react";
+```
+
+**New import: useEffect**
+
+```tsx
+import { createContext, useContext, useState, useEffect } from "react";
+```
+
+- **Problem**: We need to do something when theme changes (update the HTML)
+- **`useEffect`**: Hook that runs side effects after rendering
+- **Side effect**: Anything that affects something outside the component (like modifying the DOM)
+
+### Define Theme Context
+
+```tsx
+interface ThemeContextType {
+  theme: "light" | "dark";
+  toggleTheme: () => void;
+}
+
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+```
+
+- **`"light" | "dark"`**: TypeScript union type - theme can ONLY be these two strings
+- **`toggleTheme: () => void`**: Function that takes no arguments and returns nothing
+
+### Theme Provider
+
+```tsx
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+```
+
+- **Problem**: Need to track current theme
+- **Solution**: State variable initialized to "light"
+- **Type**: Explicitly typed as union to prevent invalid values
+
+**Apply Theme with useEffect**
+
+```tsx
+useEffect(() => {
+  document.body.setAttribute("data-bs-theme", theme);
+}, [theme]);
+```
+
+**Breaking it down**:
+
+1. **`useEffect(() => { ... }, [theme])`**
+
+   - **Problem**: We need to update the HTML when theme changes
+   - **What it does**: Runs the function whenever `theme` changes
+   - **`[theme]`**: Dependency array - re-run effect only when `theme` changes
+
+2. **`document.body.setAttribute("data-bs-theme", theme)`**
+   - **Problem**: Bootstrap needs to know which theme to apply
+   - **What it does**: Sets `data-bs-theme` attribute on the body element
+   - **Bootstrap magic**: Bootstrap CSS automatically styles everything based on this attribute
+   - **Result**: `<body data-bs-theme="dark">` applies dark theme styles
+
+**Toggle Function**
+
+```tsx
+const toggleTheme = () => {
+  setTheme((prev) => (prev === "light" ? "dark" : "light"));
+};
+```
+
+- **Problem**: User clicks theme button, we need to switch themes
+- **`setTheme((prev) => ...)`**: Update based on previous value
+  - **`prev`**: Current theme value
+  - **Ternary**: If light, switch to dark; if dark, switch to light
+- **Why this pattern**: Ensures we're always working with the latest state (important for async updates)
+
+**Provide the Context**
+
+```tsx
+return (
+  <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    {children}
+  </ThemeContext.Provider>
+);
+```
+
+- **Problem**: Make theme and toggle function available to all components
+- **Solution**: Provide both values through context
+
+**Custom Hook**
+
+```tsx
+export function useTheme() {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error("useTheme must be used within ThemeProvider");
+  }
+  return context;
+}
+```
+
+- **Same pattern as NotesContext**: Clean API with error checking
 
 ---
 
-## Part 5: Navigation Bar Component (NavBar.tsx)
+## Part 4: Navigation Bar Component (NavBar.tsx)
 
-_[Same as original tutorial - no changes needed]_
+### The Problem
+
+Every page needs:
+
+- Logo and app title
+- Navigation links (Home, Add Note)
+- Theme toggle button
+- Mobile responsive menu
+
+### The Solution
+
+```tsx
+import { Link, NavLink } from "react-router-dom";
+import { FaStickyNote, FaSun, FaMoon } from "react-icons/fa";
+import { useTheme } from "../context/ThemeContext";
+```
+
+**Imports explained**:
+
+1. **`Link` vs `NavLink`**
+
+   - **Problem**: Regular `<a>` tags reload the entire page
+   - **`Link`**: Navigation without page reload (SPA - Single Page App)
+   - **`NavLink`**: Like Link but can style the active page
+   - **Why both**: Link for logo (doesn't need active state), NavLink for menu items
+
+2. **React Icons**
+
+   - **Problem**: Need icons for logo and theme toggle
+   - **Solution**: `react-icons` provides thousands of icons as React components
+   - **Why**: Vector icons that scale perfectly, can be styled with CSS
+
+3. **useTheme hook**
+   - **Problem**: Need to access and toggle theme
+   - **Solution**: Import our custom hook
+
+### Component Function
+
+```tsx
+function Navbar() {
+  const { theme, toggleTheme } = useTheme();
+```
+
+- **Problem**: Need current theme and toggle function
+- **Solution**: Destructure from useTheme hook
+- **Result**: Can check if theme is "light" or "dark", and call `toggleTheme()` to switch
+
+### Navbar Structure
+
+```tsx
+return (
+  <nav className="navbar navbar-expand-lg">
+    <div className="container">
+```
+
+**Bootstrap classes explained**:
+
+- **`navbar`**: Base navbar styles
+- **`navbar-expand-lg`**:
+  - **Problem**: Need responsive behavior
+  - **What it does**: On large screens (lg) and up, show full menu
+  - **On small screens**: Show hamburger icon
+- **`container`**: Centers content and adds padding
+
+**Logo and Brand**
+
+```tsx
+<Link className="navbar-brand fw-bold d-flex align-items-center gap-2" to="/">
+  <FaStickyNote />
+  Notes App
+</Link>
+```
+
+**Class breakdown**:
+
+- **`navbar-brand`**: Bootstrap class for logo/brand area
+- **`fw-bold`**: Font weight bold
+- **`d-flex`**: Display flex (enables flexbox)
+- **`align-items-center`**: Vertically center flex items (icon + text)
+- **`gap-2`**: Space between flex items (icon and text)
+
+**Why `Link` instead of `<a>`**:
+
+```tsx
+// Without React Router - page reload
+<a href="/">Home</a> // ❌ Slow, loses state
+
+// With React Router - instant
+<Link to="/">Home</Link> // ✅ Fast, keeps state
+```
+
+**Mobile Toggle Button**
+
+```tsx
+<button
+  className="navbar-toggler"
+  type="button"
+  data-bs-toggle="collapse"
+  data-bs-target="#navbarNav"
+  aria-controls="navbarNav"
+  aria-expanded="false"
+  aria-label="Toggle navigation"
+>
+  <span className="navbar-toggler-icon"></span>
+</button>
+```
+
+**Attributes explained**:
+
+- **`navbar-toggler`**: Bootstrap class for hamburger button
+- **`data-bs-toggle="collapse"`**:
+  - **Problem**: Bootstrap needs to know WHAT to do
+  - **Solution**: Tells Bootstrap to collapse/expand something
+- **`data-bs-target="#navbarNav"`**:
+  - **Problem**: Bootstrap needs to know WHAT element to collapse
+  - **Solution**: Points to the element with id="navbarNav"
+- **`aria-*` attributes**: Accessibility - screen readers know this is a navigation toggle
+- **`<span className="navbar-toggler-icon">`**: The hamburger icon (three lines)
+
+**Navigation Links**
+
+```tsx
+<div
+  className="collapse navbar-collapse justify-content-end"
+  id="navbarNav"
+>
+  <ul className="navbar-nav align-items-center gap-2">
+```
+
+**Classes explained**:
+
+- **`collapse navbar-collapse`**:
+  - **Problem**: Content needs to hide on mobile, show on desktop
+  - **Solution**: Bootstrap's collapse behavior
+- **`justify-content-end`**: Push items to the right side
+- **`id="navbarNav"`**: Matches `data-bs-target` from toggle button
+- **`navbar-nav`**: List of nav items
+- **`align-items-center`**: Vertically center links and button
+- **`gap-2`**: Space between nav items
+
+**Nav Links**
+
+```tsx
+<li className="nav-item">
+  <NavLink className="nav-link" to="/">
+    Home
+  </NavLink>
+</li>
+```
+
+- **`nav-item`**: Bootstrap class for list item
+- **`nav-link`**: Bootstrap class for links
+- **`NavLink` benefit**: Automatically adds "active" class to current page
+
+**Theme Toggle Button**
+
+```tsx
+<li className="nav-item">
+  <button
+    className="btn btn-link nav-link"
+    onClick={toggleTheme}
+    aria-label="Toggle theme"
+  >
+    {theme === "light" ? <FaMoon /> : <FaSun />}
+  </button>
+</li>
+```
+
+**Breaking it down**:
+
+1. **Classes**:
+
+   - **`btn btn-link`**: Button styled as a link (no background)
+   - **`nav-link`**: Makes it look like other nav items
+
+2. **`onClick={toggleTheme}`**:
+
+   - **Problem**: Need to switch theme when clicked
+   - **Solution**: Call the toggleTheme function from context
+
+3. **Conditional icon**: `{theme === "light" ? <FaMoon /> : <FaSun />}`
+   - **Problem**: Icon should match what clicking will DO
+   - **Logic**:
+     - If light mode → show moon (clicking switches to dark)
+     - If dark mode → show sun (clicking switches to light)
+   - **Why**: User sees icon for the mode they'll get
 
 ---
 
-## Part 6: Note Card Component (NoteCard.tsx)
+## Part 5: Note Card Component (NoteCard.tsx)
 
-_[Same as original tutorial - no changes needed]_
+### The Problem
+
+We need to display each note as a card that:
+
+- Shows title, subheading, and content preview
+- Navigates to view page when clicked
+- Has edit and delete buttons
+- Edit/delete shouldn't trigger the view navigation
+
+### The Solution
+
+```tsx
+import { FaEdit, FaTrash } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { useNotes } from "../context/NotesContext";
+import type { Note } from "../context/NotesContext";
+```
+
+**Imports**:
+
+1. **Icons**: Edit and trash icons
+2. **`useNavigate`**: Hook to programmatically navigate
+   - **Problem**: We need to navigate when user clicks (not a Link)
+   - **Solution**: `navigate('/path')` function
+3. **`useNotes`**: Access deleteNote function
+4. **`Note` type**: TypeScript type for type checking props
+
+### Props Interface
+
+```tsx
+interface NoteProps {
+  note: Note;
+}
+
+function NoteCard({ note }: NoteProps) {
+```
+
+- **Problem**: TypeScript needs to know what props this component receives
+- **Solution**: Define interface with `note` property of type `Note`
+- **Destructuring**: `{ note }` extracts note from props object
+
+### Setup
+
+```tsx
+const { deleteNote } = useNotes();
+const navigate = useNavigate();
+```
+
+- **`deleteNote`**: Function to remove note from context
+- **`navigate`**: Function to change routes
+
+### Click Handlers
+
+**View Note Handler**
+
+```tsx
+const handleCardClick = () => {
+  navigate(`/note/${note.id}`);
+};
+```
+
+- **Problem**: When card is clicked, navigate to view page
+- **Solution**: Navigate to `/note/123` (where 123 is the note ID)
+- **Template literal**: `` `/note/${note.id}` `` - inserts note.id into string
+
+**Edit Handler**
+
+```tsx
+const handleEdit = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  navigate(`/edit/${note.id}`);
+};
+```
+
+**Breaking it down**:
+
+1. **`e: React.MouseEvent`**: TypeScript type for mouse click event
+2. **`e.stopPropagation()`**:
+
+   - **Problem**: Clicking edit also triggers card click (event bubbling)
+   - **What is bubbling**: Events travel up the DOM tree
+
+   ```
+   Card click handler <-- click event bubbles up
+     ↑
+   Edit button click handler <-- click starts here
+   ```
+
+   - **Solution**: Stop the event from bubbling up to the card
+   - **Result**: Only edit handler runs, not card click handler
+
+3. **Navigate to edit page**: Same pattern as handleCardClick
+
+**Delete Handler**
+
+```tsx
+const handleDelete = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  if (window.confirm("Are you sure you want to delete this note?")) {
+    deleteNote(note.id);
+  }
+};
+```
+
+**New concepts**:
+
+1. **`e.stopPropagation()`**: Same as edit - prevent card navigation
+2. **`window.confirm(...)`**:
+   - **Problem**: Prevent accidental deletions
+   - **What it does**: Shows browser confirmation dialog
+   - **Returns**: `true` if user clicks OK, `false` if Cancel
+3. **Conditional delete**: Only delete if user confirms
+
+### Render JSX
+
+**Card Container**
+
+```tsx
+<div
+  className="card shadow-sm h-100"
+  onClick={handleCardClick}
+  style={{ cursor: "pointer" }}
+>
+```
+
+**Attributes explained**:
+
+- **`card`**: Bootstrap card component
+- **`shadow-sm`**: Small shadow for depth
+- **`h-100`**:
+  - **Problem**: Cards in a row might have different heights
+  - **Solution**: Height 100% - all cards in same row match height
+- **`onClick={handleCardClick}`**: Make entire card clickable
+- **`style={{ cursor: "pointer" }}`**:
+  - **Problem**: User doesn't know card is clickable
+  - **Solution**: Change cursor to pointer (hand) on hover
+
+**Card Body**
+
+```tsx
+<div className="card-body d-flex flex-column">
+```
+
+- **`card-body`**: Bootstrap class for card content area
+- **`d-flex flex-column`**:
+  - **Problem**: Need content to stack vertically
+  - **Solution**: Flexbox in column direction
+
+**Header with Actions**
+
+```tsx
+<div className="d-flex justify-content-between align-items-start mb-2">
+  <h5 className="card-title mb-0">{note.title}</h5>
+  <div className="d-flex gap-2">
+    <FaEdit
+      className="text-primary"
+      role="button"
+      onClick={handleEdit}
+      style={{ cursor: "pointer" }}
+    />
+    <FaTrash
+      className="text-danger"
+      role="button"
+      onClick={handleDelete}
+      style={{ cursor: "pointer" }}
+    />
+  </div>
+</div>
+```
+
+**Layout explained**:
+
+1. **Outer div**: `justify-content-between`
+
+   - **Problem**: Title on left, icons on right
+   - **Solution**: Space-between puts maximum space between items
+
+2. **Title**: `{note.title}` - displays the note's title from props
+
+3. **Icons container**: `gap-2` - space between edit and trash icons
+
+4. **Icon attributes**:
+   - **`className="text-primary"`**: Bootstrap color (blue for edit)
+   - **`className="text-danger"`**: Bootstrap color (red for delete)
+   - **`role="button"`**: Accessibility - tells screen readers it's clickable
+   - **`onClick={handleEdit}`**: Calls handler when clicked
+   - **`cursor: pointer`**: Shows hand cursor on hover
+
+**Subheading and Content**
+
+```tsx
+<h6 className="card-subtitle mb-3 text-muted">{note.subheading}</h6>
+<p className="card-text">{note.content}</p>
+```
+
+- **`text-muted`**: Gray color for less emphasis
+- **`mb-3`**: Margin bottom (spacing)
+- **`{note.subheading}`** and **`{note.content}`**: Display data from props
 
 ---
 
-## Part 7: Home Page with Search (Home.tsx)
+## Part 6: Home Page (Home.tsx)
 
 ### The Problem
 
 Need a page that:
 
 - Displays all notes in a responsive grid
-- Shows loading spinner while fetching
-- Shows error message if fetch fails
-- Allows searching/filtering notes
-- Shows appropriate message if no notes or no search results
+- Shows message if no notes exist
+- Uses the NoteCard component for each note
+
+### The Solution
+
+```tsx
+import NoteCard from "../components/NoteCard";
+import { useNotes } from "../context/NotesContext";
+
+function Home() {
+  const { notes } = useNotes();
+```
+
+**Setup**:
+
+- Import NoteCard component to reuse
+- Import useNotes hook to access notes array
+- Destructure `notes` from context
+
+### Render Logic
+
+```tsx
+return (
+  <div className="container my-4">
+    <h2 className="mb-4">My Notes</h2>
+    {notes.length === 0 ? (
+```
+
+**Container and heading**:
+
+- **`container`**: Bootstrap class - centers content, adds padding
+- **`my-4`**: Margin top and bottom
+
+**Conditional rendering**: `{notes.length === 0 ? ...}`
+
+- **Problem**: Show different UI based on whether notes exist
+- **Solution**: JavaScript ternary operator in JSX
+- **Condition**: If notes array is empty...
+
+### Empty State
+
+```tsx
+<div className="alert alert-info" role="alert">
+  No notes yet. Click "Add Note" to create your first note!
+</div>
+```
+
+- **Problem**: Empty page looks broken
+- **Solution**: Friendly message guiding users
+- **`alert alert-info`**: Bootstrap info box (blue background)
+- **`role="alert"`**: Accessibility - screen readers announce this
+
+### Notes Grid
+
+```tsx
+) : (
+  <div className="row g-3">
+    {notes.map((note) => (
+      <div className="col-12 col-md-6 col-lg-4" key={note.id}>
+        <NoteCard note={note} />
+      </div>
+    ))}
+  </div>
+)}
+```
+
+**Bootstrap Grid System explained**:
+
+1. **`row`**: Container for columns
+
+   - **How it works**: Flexbox container
+   - **Purpose**: Hold column layouts
+
+2. **`g-3`**: Gutter (gap) between columns
+
+   - **Problem**: Columns touching look cramped
+   - **Solution**: Adds spacing
+
+3. **Column classes**: `col-12 col-md-6 col-lg-4`
+
+   - **Bootstrap grid**: 12 columns total per row
+   - **`col-12`**: On mobile, take all 12 columns (full width = 1 note per row)
+   - **`col-md-6`**: On medium screens, take 6 columns (half width = 2 notes per row)
+   - **`col-lg-4`**: On large screens, take 4 columns (third width = 3 notes per row)
+
+   **Visual representation**:
+
+   ```
+   Mobile:       Medium:           Large:
+   [   Note 1  ] [Note 1][Note 2]  [N1][N2][N3]
+   [   Note 2  ] [Note 3][Note 4]  [N4][N5][N6]
+   [   Note 3  ]
+   ```
+
+**Map function**:
+
+```tsx
+{
+  notes.map((note) => (
+    <div className="col-12 col-md-6 col-lg-4" key={note.id}>
+      <NoteCard note={note} />
+    </div>
+  ));
+}
+```
+
+1. **`.map()`**:
+
+   - **Problem**: Need to create a card for each note
+   - **What it does**: Transforms array - for each note, return JSX
+   - **Result**: Array of JSX elements
+
+2. **`key={note.id}`**:
+
+   - **Problem**: React needs to track which items changed
+   - **Solution**: Unique key for each element
+   - **Why important**:
+     - Helps React efficiently update only changed items
+     - Prevents bugs when reordering/adding/removing items
+   - **Must be unique**: Using note.id ensures uniqueness
+
+3. **`<NoteCard note={note} />`**:
+   - **Problem**: Need to pass data to component
+   - **Solution**: Pass entire note object as `note` prop
+
+---
+
+## Part 7: Add Note Page (AddNote.tsx)
+
+### The Problem
+
+Need a form to:
+
+- Collect title, subheading, and content
+- Validate inputs
+- Add note to global state
+- Navigate back to home after adding
 
 ### The Solution
 
 ```tsx
 import { useState } from "react";
-import NoteCard from "../components/NoteCard";
+import type { FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { useNotes } from "../context/NotesContext";
-
-function Home() {
-  const { notes, loading } = useNotes();
-  const [searchQuery, setSearchQuery] = useState("");
 ```
 
-**New state**:
+**Imports**:
 
-- **`searchQuery`**: Stores user's search input
-- **`loading`**: Destructured from context to show loading state
+- **`useState`**: Manage form input values
+- **`FormEvent`**: TypeScript type for form submission event
+- **`useNavigate`**: Navigate to home after adding
+- **`useNotes`**: Access addNote function
 
-### Search Filtering
+### State Setup
 
 ```tsx
-// Filter notes based on search query
-const filteredNotes = notes.filter((note) => {
-  const query = searchQuery.toLowerCase();
-  return (
-    note.title.toLowerCase().includes(query) ||
-    note.subheading.toLowerCase().includes(query) ||
-    note.content.toLowerCase().includes(query)
-  );
-});
+function AddNote() {
+  const [title, setTitle] = useState("");
+  const [subheading, setSubheading] = useState("");
+  const [content, setContent] = useState("");
+  const { addNote } = useNotes();
+  const navigate = useNavigate();
 ```
 
-**How it works**:
+**Why three state variables?**
 
-1. **`.filter()`**: Creates new array with items that pass test
+- **Problem**: Form has three inputs, each needs its own state
+- **Solution**: Separate state for each field
+- **Initialized to `""`**: Empty strings for empty inputs
 
-2. **Convert to lowercase**: `searchQuery.toLowerCase()`
-
-   - **Problem**: "React" should match "react" or "REACT"
-   - **Solution**: Compare lowercase versions
-   - **Case-insensitive**: User-friendly search
-
-3. **Check multiple fields**: `title || subheading || content`
-
-   - **Problem**: Note might match in any field
-   - **Solution**: Use OR operator to check all fields
-   - **Result**: More comprehensive search
-
-4. **`.includes()`**: Check if string contains substring
-   - **Example**: "Learn React".includes("react") → true
-   - **Why**: Partial matches are useful
-
-### Search Input
+### Form Submission Handler
 
 ```tsx
-<div className="mb-4">
+const handleSubmit = (e: FormEvent) => {
+  e.preventDefault();
+  if (title.trim() && subheading.trim() && content.trim()) {
+    addNote({ title, subheading, content });
+    navigate("/");
+  }
+};
+```
+
+**Line by line**:
+
+1. **`e.preventDefault()`**:
+
+   - **Problem**: Forms normally submit and reload the page
+   - **Default behavior**: Browser sends form data to server, page refreshes
+   - **Solution**: Prevent default behavior
+   - **Result**: We handle the form with JavaScript instead
+
+2. **Validation**: `if (title.trim() && subheading.trim() && content.trim())`
+
+   - **Problem**: Users might submit empty or whitespace-only inputs
+   - **`.trim()`**: Removes whitespace from start and end
+   - **Logic**: All three must have actual content (truthy after trim)
+   - **Why**: Prevents empty notes
+
+3. **Add note**: `addNote({ title, subheading, content })`
+
+   - **Object shorthand**: `{ title: title }` becomes `{ title }`
+   - **Calls context function**: Adds to global state
+   - **No ID**: Context generates it automatically
+
+4. **Navigate**: `navigate("/")`
+   - **Problem**: User should see their new note
+   - **Solution**: Go back to home page
+   - **Result**: Home page re-renders with new note included
+
+### Form JSX
+
+**Layout Structure**
+
+```tsx
+<div className="container my-4">
+  <div className="row justify-content-center">
+    <div className="col-12 col-md-8 col-lg-6">
+      <div className="card shadow">
+```
+
+**Centering the form**:
+
+- **`row justify-content-center`**: Center the column horizontally
+- **`col-12 col-md-8 col-lg-6`**:
+  - Mobile: Full width
+  - Medium: 8/12 = 66% width
+  - Large: 6/12 = 50% width
+- **Why**: Form doesn't need full width, looks better centered
+
+**Form Element**
+
+```tsx
+<form onSubmit={handleSubmit}>
+```
+
+- **`onSubmit={handleSubmit}`**: When form submits (Enter key or submit button), call our handler
+
+### Input Fields
+
+**Title Input**
+
+```tsx
+<div className="mb-3">
+  <label htmlFor="title" className="form-label">
+    Title
+  </label>
   <input
     type="text"
     className="form-control"
-    placeholder="Search notes by title, subheading, or content..."
-    value={searchQuery}
-    onChange={(e) => setSearchQuery(e.target.value)}
+    id="title"
+    value={title}
+    onChange={(e) => setTitle(e.target.value)}
+    required
   />
 </div>
 ```
 
-**Controlled input**:
+**Attributes explained**:
 
-- **`value={searchQuery}`**: Input shows current state
-- **`onChange`**: Updates state on every keystroke
-- **Result**: As user types, filteredNotes updates automatically
+1. **`htmlFor="title"`**:
 
-### Loading State
+   - **Problem**: Clicking label should focus input
+   - **Solution**: Links label to input with matching `id`
+   - **Accessibility**: Screen readers know label describes this input
+
+2. **`value={title}`**:
+
+   - **Problem**: React needs to control the input value
+   - **Solution**: Input shows current state value
+   - **This is "controlled component"**: React state is the source of truth
+
+3. **`onChange={(e) => setTitle(e.target.value)}`**:
+
+   - **Problem**: State needs to update when user types
+   - **What happens**:
+     1. User types a character
+     2. onChange event fires
+     3. `e.target.value` is the new input value
+     4. `setTitle()` updates state
+     5. React re-renders with new value
+   - **Why this pattern**: Keeps state in sync with input
+
+4. **`required`**:
+   - **Problem**: Need basic validation
+   - **Solution**: Browser won't submit form if empty
+   - **Note**: We also have JavaScript validation in `handleSubmit`
+
+**Content Textarea**
 
 ```tsx
-{
-  loading ? (
-    <div className="text-center my-5">
-      <div className="spinner-border text-primary" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </div>
-    </div>
-  ) : notes.length === 0 ? (
-    // Empty state
-  ) : filteredNotes.length === 0 ? (
-    // No search results
-  ) : (
-    // Notes grid
-  );
-}
+<textarea
+  className="form-control"
+  id="content"
+  rows={5}
+  value={content}
+  onChange={(e) => setContent(e.target.value)}
+  required
+></textarea>
 ```
 
-**Conditional rendering flow**:
+**Why `<textarea>` instead of `<input>`?**
 
-1. **If loading**: Show spinner
+- **Problem**: Need multi-line text input
+- **Solution**: Textarea allows multiple lines
+- **`rows={5}`**: Initial height (5 lines)
 
-   - **Problem**: Fetch takes time, show feedback
-   - **Solution**: Bootstrap spinner component
-   - **Accessibility**: `visually-hidden` for screen readers
-
-2. **Else if no notes**: Show "no notes" message
-
-3. **Else if no search results**: Show "no matches" message
-
-4. **Else**: Show notes grid
-
-### Empty State
+**Note about value in React**:
 
 ```tsx
-notes.length === 0 ? (
-  <div className="alert alert-info" role="alert">
-    No notes yet. Click "Add Note" to create your first note!
-  </div>
-)
+// HTML way (uncontrolled):
+<textarea>Default text here</textarea>
+
+// React way (controlled):
+<textarea value={content}></textarea>
 ```
 
-### No Search Results State
+- In React, use `value` prop, not children
+
+### Buttons
 
 ```tsx
-filteredNotes.length === 0 ? (
-  <div className="alert alert-warning" role="alert">
-    No notes found matching "{searchQuery}". Try a different search term.
-  </div>
-)
-```
-
-**Why separate from empty state**:
-
-- **Problem**: Different user scenarios
-- **Empty**: No notes exist at all
-- **No results**: Notes exist but don't match search
-- **Solution**: Different messages guide user appropriately
-
-### Notes Grid
-
-```tsx
-<div className="row g-3">
-  {filteredNotes.map((note) => (
-    <div className="col-12 col-md-6 col-lg-4" key={note.id}>
-      <NoteCard note={note} />
-    </div>
-  ))}
+<div className="d-flex gap-2">
+  <button type="submit" className="btn btn-primary">
+    Add Note
+  </button>
+  <button
+    type="button"
+    className="btn btn-secondary"
+    onClick={() => navigate("/")}
+  >
+    Cancel
+  </button>
 </div>
 ```
 
-**Use `filteredNotes` not `notes`**:
+**Button types**:
 
-- **Problem**: Need to show search results
-- **Solution**: Map over filtered array
-- **Result**: Only matching notes display
+1. **Submit button**: `type="submit"`
+
+   - **Problem**: Need to submit the form
+   - **What happens**: Clicking triggers form's `onSubmit`
+   - **Also works**: Pressing Enter in any input
+
+2. **Cancel button**: `type="button"`
+   - **Problem**: Don't want this button to submit
+   - **Solution**: `type="button"` means "just a button, don't submit"
+   - **`onClick={() => navigate("/")}`**: Go home without saving
+
+**Button styling**:
+
+- **`btn`**: Base Bootstrap button class
+- **`btn-primary`**: Blue button (primary action)
+- **`btn-secondary`**: Gray button (secondary action)
 
 ---
 
-## Part 8: Unified Note Page (NotePage.tsx)
+## Part 8: Edit Note Page (EditNote.tsx)
 
 ### The Problem
 
-Previous implementation had three separate components:
+Need a form to:
 
-- AddNote.tsx - Form to create note
-- EditNote.tsx - Form to edit note
-- ViewNote.tsx - Display note details
+- Load existing note data
+- Allow editing
+- Update the note in global state
+- Handle case where note doesn't exist
 
-**Issues**:
-
-- Code duplication (same form in Add and Edit)
-- Hard to maintain (change form → update two files)
-- More components to manage
-
-### The Solution: One Component, Three Modes
-
-Create a single component that handles all three scenarios based on the URL.
+### The Solution
 
 ```tsx
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { FaEdit, FaArrowLeft } from "react-icons/fa";
+import { useParams, useNavigate } from "react-router-dom";
 import { useNotes } from "../context/NotesContext";
 ```
 
 **New imports**:
 
-- **`useLocation`**: Get current URL path
-- **Reason**: Determine mode based on URL
+- **`useEffect`**: Load note data when component mounts
+- **`useParams`**: Get note ID from URL
 
-### Determine Mode from URL
+### Getting Note ID from URL
 
 ```tsx
-function NotePage() {
+function EditNote() {
   const { id } = useParams();
-  const { getNote, addNote, updateNote } = useNotes();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Determine mode based on URL path
-  const mode = location.pathname.startsWith("/add")
-    ? "add"
-    : location.pathname.includes("/edit/")
-    ? "edit"
-    : "view";
 ```
 
-**How it works**:
+- **Problem**: URL is `/edit/123`, we need the `123`
+- **Solution**: `useParams()` extracts route parameters
+- **How it works**:
+  - Route defined as: `/edit/:id`
+  - URL is: `/edit/123`
+  - `useParams()` returns: `{ id: "123" }`
+  - We destructure: `const { id } = useParams()`
 
-1. **`useLocation()`**: Returns location object with pathname
-
-2. **Check pathname patterns**:
-
-   - `/add` → "add" mode
-   - `/edit/123` → "edit" mode
-   - `/note/123` → "view" mode
-
-3. **Ternary chain**: Checks conditions in order
-   - **First match wins**: If path starts with `/add`, mode is "add"
-   - **Fallback**: Default to "view"
-
-**URL examples**:
-
-| URL          | mode   |
-| ------------ | ------ |
-| `/add`       | "add"  |
-| `/edit/5`    | "edit" |
-| `/note/5`    | "view" |
-| `/edit/1234` | "edit" |
-
-### State for Form
+### State and Context
 
 ```tsx
+const { getNote, updateNote } = useNotes();
+const navigate = useNavigate();
 const [title, setTitle] = useState("");
 const [subheading, setSubheading] = useState("");
 const [content, setContent] = useState("");
 ```
 
-**Used in all modes**:
+- Same as AddNote, but we also need `getNote` and `updateNote`
 
-- **Add mode**: Empty initially
-- **Edit mode**: Loaded from note
-- **View mode**: Loaded from note (read-only display)
-
-### Load Note Data (Edit/View Modes)
+### Loading Note Data
 
 ```tsx
 useEffect(() => {
-  if ((mode === "view" || mode === "edit") && id) {
+  if (id) {
     const note = getNote(Number(id));
     if (note) {
       setTitle(note.title);
@@ -1062,159 +1485,243 @@ useEffect(() => {
       navigate("/");
     }
   }
-}, [id, mode, getNote, navigate]);
+}, [id, getNote, navigate]);
 ```
 
-**Breaking it down**:
+**Breaking down this useEffect**:
 
-1. **Condition**: `(mode === "view" || mode === "edit") && id`
+1. **When does it run?**:
 
-   - **Problem**: Only view/edit need to load note, add doesn't
-   - **Solution**: Check mode before loading
-   - **Also check id**: ID must exist in URL
+   - **Problem**: Need to load note when component first renders
+   - **Solution**: useEffect runs after render
+   - **Dependencies**: `[id, getNote, navigate]` - re-run if any change
 
-2. **Get note**: `const note = getNote(Number(id))`
+2. **`if (id)`**:
 
-   - **Convert**: URL params are strings, IDs are numbers
-   - **Find**: Search notes array for matching ID
+   - **Problem**: ID might be undefined initially
+   - **Solution**: Only proceed if ID exists
 
-3. **If found**: Set form state to note values
+3. **`const note = getNote(Number(id))`**:
 
-   - **Result**: Form displays existing data
+   - **Problem**: URL params are strings, IDs are numbers
+   - **`Number(id)`**: Converts "123" to 123
+   - **`getNote()`**: Finds note with this ID
 
-4. **If not found**: Redirect to home
-   - **Problem**: User might access `/note/999` where 999 doesn't exist
-   - **Solution**: Redirect to prevent error
+4. **If note found**:
 
-### Form Submission Handler
+   ```tsx
+   if (note) {
+     setTitle(note.title);
+     setSubheading(note.subheading);
+     setContent(note.content);
+   ```
+
+   - **Problem**: Form inputs need to show existing data
+   - **Solution**: Set state to note's values
+   - **Result**: Form displays current note data
+
+5. **If note not found**:
+   ```tsx
+   } else {
+     navigate("/");
+   }
+   ```
+   - **Problem**: User might access `/edit/999` where note 999 doesn't exist
+   - **Solution**: Redirect to home
+   - **Why**: Prevent showing empty form for non-existent note
+
+### Update Handler
 
 ```tsx
 const handleSubmit = (e: FormEvent) => {
   e.preventDefault();
-  if (title.trim() && subheading.trim() && content.trim()) {
-    if (mode === "add") {
-      addNote({ title, subheading, content });
-    } else if (mode === "edit" && id) {
-      updateNote(Number(id), { title, subheading, content });
-    }
+  if (id && title.trim() && subheading.trim() && content.trim()) {
+    updateNote(Number(id), { title, subheading, content });
     navigate("/");
   }
 };
 ```
 
-**Mode-based logic**:
+**Differences from AddNote**:
 
-1. **Add mode**: Call `addNote()` with form data
+1. **Extra check**: `id &&` - make sure we have an ID
+2. **`updateNote()`** instead of `addNote()`:
+   - **First argument**: Note ID to update
+   - **Second argument**: New data (without ID)
+3. **Same validation and navigation**: Rest is identical
 
-   - **No ID**: Context generates it
+### Form JSX
 
-2. **Edit mode**: Call `updateNote()` with ID and form data
+The form structure is identical to AddNote:
 
-   - **ID required**: Must know which note to update
+- Same layout (centered card)
+- Same three inputs
+- Same buttons
 
-3. **Both**: Navigate home after success
-   - **Result**: User sees updated notes list
+**Only differences**:
 
-### View Mode Rendering
+1. Title says "Edit Note" instead of "Add New Note"
+2. Button says "Update Note" instead of "Add Note"
+3. Form loads with existing data (from useEffect)
 
-```tsx
-// View mode - read-only display
-if (mode === "view") {
-  return (
-    <div className="container my-4">
-      <div className="row justify-content-center">
-        <div className="col-12 col-md-8 col-lg-6">
-          <div className="card shadow">
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start mb-3">
-                <button
-                  className="btn btn-outline-secondary btn-sm"
-                  onClick={() => navigate("/")}
-                >
-                  <FaArrowLeft className="me-2" />
-                  Back
-                </button>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => navigate(`/edit/${id}`)}
-                >
-                  <FaEdit className="me-2" />
-                  Edit
-                </button>
-              </div>
-              <h1 className="card-title mb-3">{title}</h1>
-              <h5 className="card-subtitle mb-4 text-muted">{subheading}</h5>
-              <div className="card-text">
-                <p style={{ whiteSpace: "pre-wrap" }}>{content}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-```
+**Why reuse the structure?**
 
-**Key features**:
-
-- **Action buttons**: Back (to home) and Edit (switch to edit mode)
-- **Display content**: Show title, subheading, content
-- **No form**: Just display data
-- **`whiteSpace: "pre-wrap"`**: Preserve line breaks from textarea
-
-### Add/Edit Mode Rendering
-
-```tsx
-// Add/Edit mode - form
-return (
-  <div className="container my-4">
-    <div className="row justify-content-center">
-      <div className="col-12 col-md-8 col-lg-6">
-        <div className="card shadow">
-          <div className="card-body">
-            <h2 className="card-title mb-4">
-              {mode === "add" ? "Add New Note" : "Edit Note"}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              {/* Form inputs */}
-              <div className="d-flex gap-2">
-                <button type="submit" className="btn btn-primary">
-                  {mode === "add" ? "Add Note" : "Update Note"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => navigate("/")}
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-```
-
-**Dynamic text based on mode**:
-
-- **Title**: "Add New Note" vs "Edit Note"
-- **Button**: "Add Note" vs "Update Note"
-- **Same form**: Code reused for both modes
-
-**Benefits of this approach**:
-
-1. **Less code duplication**: One form for add and edit
-2. **Easier maintenance**: Update form once
-3. **Cleaner routing**: One component handles multiple routes
-4. **Consistent UI**: Guaranteed same layout
+- **Problem**: Forms look inconsistent
+- **Solution**: Same HTML structure = consistent UI
+- **Potential improvement**: Could extract into a shared component
 
 ---
 
-## Part 9: App Component with Routes (App.tsx)
+## Part 9: View Note Page (ViewNote.tsx)
+
+### The Problem
+
+Need a page to:
+
+- Display full note details (not just a preview)
+- Show back button to return to home
+- Show edit button for quick editing
+- Handle non-existent notes
+
+### The Solution
+
+```tsx
+import { useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { FaEdit, FaArrowLeft } from "react-icons/fa";
+import { useNotes } from "../context/NotesContext";
+```
+
+**New icons**:
+
+- **`FaEdit`**: Edit icon for edit button
+- **`FaArrowLeft`**: Arrow icon for back button
+
+### Getting and Validating Note
+
+```tsx
+function ViewNote() {
+  const { id } = useParams();
+  const { getNote } = useNotes();
+  const navigate = useNavigate();
+  const note = id ? getNote(Number(id)) : undefined;
+```
+
+**`const note = id ? getNote(Number(id)) : undefined`**:
+
+- **Problem**: Need to get the note, but ID might be undefined
+- **Ternary operator**:
+  - If `id` exists: Call `getNote(Number(id))`
+  - If `id` is undefined: Set note to `undefined`
+- **Why**: Prevents calling `getNote(undefined)` which would be an error
+
+### Redirect if Note Not Found
+
+```tsx
+useEffect(() => {
+  if (id && !note) {
+    navigate("/");
+  }
+}, [id, note, navigate]);
+```
+
+- **Problem**: User might access `/note/999` where note doesn't exist
+- **Condition**: `id && !note` - we have an ID but no note was found
+- **Solution**: Redirect to home
+- **Dependencies**: Re-run if id, note, or navigate changes
+
+### Early Return
+
+```tsx
+if (!note) {
+  return null;
+}
+```
+
+- **Problem**: Can't render note details if note doesn't exist
+- **Solution**: Return `null` (renders nothing)
+- **When this happens**:
+  - Initial render before useEffect runs
+  - After redirect starts but before navigation completes
+- **Result**: Prevents errors from trying to access `note.title` when note is undefined
+
+### Action Buttons
+
+```tsx
+<div className="d-flex justify-content-between align-items-start mb-3">
+  <button
+    className="btn btn-outline-secondary btn-sm"
+    onClick={() => navigate("/")}
+  >
+    <FaArrowLeft className="me-2" />
+    Back
+  </button>
+  <button
+    className="btn btn-primary btn-sm"
+    onClick={() => navigate(`/edit/${note.id}`)}
+  >
+    <FaEdit className="me-2" />
+    Edit
+  </button>
+</div>
+```
+
+**Layout**:
+
+- **`justify-content-between`**: Back on left, Edit on right
+- **`align-items-start`**: Align to top (if buttons different heights)
+
+**Button styles**:
+
+- **`btn-outline-secondary`**: Gray outline button (less prominent)
+- **`btn-primary`**: Solid blue button (more prominent)
+- **`btn-sm`**: Small size buttons
+- **`me-2`**: Margin end (right) 2 - space between icon and text
+
+**Navigation**:
+
+- **Back**: `navigate("/")` - go to home
+- **Edit**: `navigate(`/edit/${note.id}`)` - go to edit page with this note's ID
+
+### Note Content Display
+
+```tsx
+<h1 className="card-title mb-3">{note.title}</h1>
+<h5 className="card-subtitle mb-4 text-muted">{note.subheading}</h5>
+<div className="card-text">
+  <p style={{ whiteSpace: "pre-wrap" }}>{note.content}</p>
+</div>
+```
+
+**Heading sizes**:
+
+- **`<h1>`**: Large heading for title (this is the main content)
+- **`<h5>`**: Smaller for subheading
+
+**Content formatting**: `style={{ whiteSpace: "pre-wrap" }}`
+
+- **Problem**: Line breaks in textarea don't show in rendered HTML
+- **Example**:
+
+  ```
+  User types:
+  Line 1
+  Line 2
+
+  Without pre-wrap displays as:
+  Line 1 Line 2
+
+  With pre-wrap displays as:
+  Line 1
+  Line 2
+  ```
+
+- **`pre-wrap`**: Preserves line breaks and whitespace
+- **Why in style prop**: This CSS property isn't available as a Bootstrap class
+
+---
+
+## Part 10: App Component (App.tsx)
 
 ### The Problem
 
@@ -1222,18 +1729,31 @@ Need to:
 
 - Wrap app with context providers
 - Set up routing for all pages
-- Map URLs to the NotePage component with different modes
+- Define which component shows for each URL
 
 ### The Solution
 
 ```tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
-import NotePage from "./pages/NotePage";
+import AddNote from "./pages/AddNote";
+import EditNote from "./pages/EditNote";
+import ViewNote from "./pages/ViewNote";
 import Navbar from "./components/NavBar";
 import { NotesProvider } from "./context/NotesContext";
 import { ThemeProvider } from "./context/ThemeContext";
+```
 
+**Imports explained**:
+
+- **Router components**: BrowserRouter, Routes, Route
+- **Page components**: Home, AddNote, EditNote, ViewNote
+- **Other components**: Navbar
+- **Context providers**: NotesProvider, ThemeProvider
+
+### App Structure
+
+```tsx
 function App() {
   return (
     <ThemeProvider>
@@ -1242,9 +1762,9 @@ function App() {
           <Navbar />
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/add" element={<NotePage />} />
-            <Route path="/note/:id" element={<NotePage />} />
-            <Route path="/edit/:id" element={<NotePage />} />
+            <Route path="/add" element={<AddNote />} />
+            <Route path="/note/:id" element={<ViewNote />} />
+            <Route path="/edit/:id" element={<EditNote />} />
           </Routes>
         </BrowserRouter>
       </NotesProvider>
@@ -1253,31 +1773,96 @@ function App() {
 }
 ```
 
-### Routes Explained
+### Provider Wrapping Order
 
-**Same component, different URLs**:
+**Why this order?**
 
-```tsx
-<Route path="/add" element={<NotePage />} />
-<Route path="/note/:id" element={<NotePage />} />
-<Route path="/edit/:id" element={<NotePage />} />
+1. **`<ThemeProvider>` (outermost)**:
+
+   - **Problem**: Theme needs to work everywhere, including navbar and all pages
+   - **Solution**: Wrap everything with ThemeProvider
+   - **Result**: All components can use `useTheme()`
+
+2. **`<NotesProvider>`**:
+
+   - **Problem**: Notes data needs to be accessible in all pages
+   - **Solution**: Wrap content with NotesProvider
+   - **Result**: All components can use `useNotes()`
+
+3. **`<BrowserRouter>`**:
+   - **Problem**: Need routing functionality
+   - **Solution**: BrowserRouter enables routing
+   - **Must wrap Routes**: All Route components must be inside a Router
+
+**Visual hierarchy**:
+
+```
+ThemeProvider (theme available)
+  ↓
+NotesProvider (notes available)
+  ↓
+BrowserRouter (routing available)
+  ↓
+Navbar (always visible)
+Routes (one page shows at a time)
 ```
 
-**How NotePage knows which mode**:
+### Navbar Outside Routes
 
-- Checks `location.pathname` inside component
-- `/add` → add mode
-- `/note/5` → view mode
-- `/edit/5` → edit mode
+```tsx
+<BrowserRouter>
+  <Navbar />
+  <Routes>...</Routes>
+</BrowserRouter>
+```
 
-**Route mapping**:
+- **Problem**: Navbar should appear on every page
+- **Solution**: Place outside `<Routes>`
+- **Result**: Navbar always renders, only page content changes
 
-| Path        | Component | Mode | Description     |
-| ----------- | --------- | ---- | --------------- |
-| `/`         | Home      | -    | Shows all notes |
-| `/add`      | NotePage  | add  | Create new note |
-| `/note/:id` | NotePage  | view | View note       |
-| `/edit/:id` | NotePage  | edit | Edit note       |
+### Route Definitions
+
+**Basic Route**
+
+```tsx
+<Route path="/" element={<Home />} />
+```
+
+- **`path="/"`**: URL pattern to match
+- **`element={<Home />}`**: Component to render when path matches
+- **How it works**: When URL is exactly `/`, show Home component
+
+**Routes with Parameters**
+
+```tsx
+<Route path="/note/:id" element={<ViewNote />} />
+<Route path="/edit/:id" element={<EditNote />} />
+```
+
+- **`:id`**: Route parameter - matches any value
+- **Examples**:
+  - `/note/1` → matches, id = "1"
+  - `/note/123` → matches, id = "123"
+  - `/note/abc` → matches, id = "abc"
+  - `/note` → doesn't match (missing id)
+
+**All Routes**:
+
+| Path        | Component | Description              |
+| ----------- | --------- | ------------------------ |
+| `/`         | Home      | Shows all notes          |
+| `/add`      | AddNote   | Form to create note      |
+| `/note/:id` | ViewNote  | View single note details |
+| `/edit/:id` | EditNote  | Form to edit note        |
+
+**How React Router works**:
+
+1. User clicks a Link or navigates
+2. URL changes (e.g., to `/note/5`)
+3. React Router looks at all Route components
+4. Finds matching path (`/note/:id` matches)
+5. Renders that Route's element (ViewNote)
+6. ViewNote uses `useParams()` to get `{ id: "5" }`
 
 ---
 
@@ -1285,223 +1870,346 @@ function App() {
 
 ### Q1: Why do we need keys in lists?
 
-_[Same as original]_
+**Answer**:
+
+```tsx
+// Without keys (React doesn't know which item is which)
+{
+  notes.map((note) => <NoteCard note={note} />);
+}
+
+// With keys (React can track each item)
+{
+  notes.map((note) => <NoteCard key={note.id} note={note} />);
+}
+```
+
+**What happens without keys**:
+
+1. You have 3 notes
+2. You delete the 2nd note
+3. React doesn't know which note was deleted
+4. React might delete the wrong note or update the wrong item
+
+**With keys**:
+
+- React knows: "The note with key={2} was removed"
+- React only removes that specific note
 
 ### Q2: What's the difference between state and props?
 
-_[Same as original]_
+**Answer**:
+
+**Props** (Properties):
+
+- Data passed FROM parent TO child
+- Read-only (child can't modify)
+- Like function arguments
+
+```tsx
+// Parent passes prop
+<NoteCard note={myNote} />;
+
+// Child receives prop (can't change it)
+function NoteCard({ note }) {
+  // note.title = "New Title" // ❌ Don't do this!
+  return <h5>{note.title}</h5>;
+}
+```
+
+**State**:
+
+- Data that belongs to the component
+- Can be changed with setter function
+- Triggers re-render when changed
+
+```tsx
+function AddNote() {
+  const [title, setTitle] = useState("");
+
+  // ✅ Can modify own state
+  setTitle("New Title");
+}
+```
 
 ### Q3: Why do we need useEffect?
 
-_[Same as original]_
+**Answer**:
+
+**Without useEffect** (wrong way):
+
+```tsx
+function EditNote() {
+  const { id } = useParams();
+  const note = getNote(Number(id));
+
+  // ❌ This runs on every render, causes infinite loop!
+  setTitle(note.title);
+}
+```
+
+**With useEffect** (correct way):
+
+```tsx
+function EditNote() {
+  const { id } = useParams();
+
+  // ✅ Only runs when id changes
+  useEffect(() => {
+    const note = getNote(Number(id));
+    setTitle(note.title);
+  }, [id]);
+}
+```
+
+**Why**:
+
+- Setting state triggers re-render
+- Re-render runs component function again
+- Without useEffect, this creates infinite loop
+- useEffect only runs when dependencies change
 
 ### Q4: What's the difference between `navigate()` and `<Link>`?
 
-_[Same as original]_
+**Answer**:
+
+**`<Link>`** - Declarative navigation:
+
+```tsx
+<Link to="/add">Add Note</Link>
+```
+
+- Use for: Navigation links in UI
+- User action: Clicks link
+- Like: Regular `<a>` tag but without page reload
+
+**`navigate()`** - Programmatic navigation:
+
+```tsx
+const navigate = useNavigate();
+
+function handleSubmit() {
+  addNote(data);
+  navigate("/"); // Navigate after action
+}
+```
+
+- Use for: Navigation after logic/actions
+- Trigger: JavaScript code
+- Like: `window.location.href` but without page reload
 
 ### Q5: Why `e.preventDefault()` in forms?
 
-_[Same as original]_
+**Answer**:
+
+**Default form behavior**:
+
+```
+User submits form
+  ↓
+Browser sends data to server
+  ↓
+Page reloads
+  ↓
+All state is lost
+  ↓
+React app restarts
+```
+
+**With `e.preventDefault()`**:
+
+```
+User submits form
+  ↓
+e.preventDefault() stops default behavior
+  ↓
+Our JavaScript handles it
+  ↓
+No page reload
+  ↓
+State persists
+  ↓
+Better user experience
+```
 
 ### Q6: Why can't we just use regular variables instead of state?
 
-_[Same as original]_
+**Answer**:
+
+**Regular variable** (doesn't work):
+
+```tsx
+function Counter() {
+  let count = 0;
+
+  function increment() {
+    count = count + 1; // Updates variable
+    console.log(count); // Shows new value
+  }
+
+  // ❌ UI still shows 0!
+  return <div>{count}</div>;
+}
+```
+
+**Why it fails**: React doesn't know to re-render when regular variable changes.
+
+**State variable** (works):
+
+```tsx
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  function increment() {
+    setCount(count + 1); // Updates state
+  }
+
+  // ✅ UI updates to show new value!
+  return <div>{count}</div>;
+}
+```
+
+**Why it works**: `setCount()` tells React "state changed, re-render please!"
 
 ### Q7: What is "lifting state up"?
 
-_[Same as original]_
+**Answer**:
+
+**Problem**: Two sibling components need to share data
+
+```tsx
+// ❌ Can't pass data between siblings directly
+<App>
+  <ComponentA /> {/* Has the data */}
+  <ComponentB /> {/* Needs the data */}
+</App>
+```
+
+**Solution**: Move state to common parent
+
+```tsx
+function App() {
+  const [data, setData] = useState(""); // Lifted up!
+
+  return (
+    <>
+      <ComponentA data={data} setData={setData} />
+      <ComponentB data={data} />
+    </>
+  );
+}
+```
+
+**Our app example**: Notes are in Context (highest level) so all pages can access them.
 
 ### Q8: Why do we need Context? Can't we just prop drill?
 
-_[Same as original]_
+**Answer**:
+
+**Prop drilling** (tedious):
+
+```tsx
+<App notes={notes}>
+  <Layout notes={notes}>
+    <Sidebar notes={notes}>
+      <UserMenu notes={notes}>
+        <NoteCount notes={notes} /> {/* Finally used here */}
+      </UserMenu>
+    </Sidebar>
+  </Layout>
+</App>
+```
+
+- Pass through 4 components that don't use it
+- Tedious and error-prone
+- Hard to maintain
+
+**Context** (clean):
+
+```tsx
+<NotesProvider>
+  <App>
+    <Layout>
+      <Sidebar>
+        <UserMenu>
+          <NoteCount /> {/* Just use useNotes() */}
+        </UserMenu>
+      </Sidebar>
+    </Layout>
+  </App>
+</NotesProvider>
+```
+
+- No prop drilling
+- Components only declare what they need
+- Easy to maintain
 
 ### Q9: What does the spread operator `...` do?
 
-_[Same as original]_
+**Answer**:
+
+**With objects**:
+
+```tsx
+const note = { title: "Learn React", content: "Study hard" };
+const newNote = { ...note, id: 1 };
+// Result: { title: "Learn React", content: "Study hard", id: 1 }
+```
+
+- Copies all properties from `note`
+- Adds new property `id`
+
+**With arrays**:
+
+```tsx
+const notes = [note1, note2];
+const newNotes = [newNote, ...notes];
+// Result: [newNote, note1, note2]
+```
+
+- Creates new array
+- Spreads old array items after new item
+
+**Why we use it**: React requires immutability (new objects/arrays, not modified ones).
 
 ### Q10: What's the Virtual DOM and why does React use it?
 
-_[Same as original]_
-
-### Q11: What's the difference between async/await and .then()?
-
 **Answer**:
 
-Both handle Promises, but `async/await` is cleaner syntax.
+**Without Virtual DOM** (slow):
 
-**With .then() (older style)**:
-
-```tsx
-function fetchNotes() {
-  fetch("https://api.example.com/notes")
-    .then((response) => response.json())
-    .then((data) => {
-      setNotes(data);
-    })
-    .catch((error) => {
-      console.error(error);
-    });
-}
+```
+State changes
+  ↓
+Update entire real DOM
+  ↓
+Browser recalculates everything
+  ↓
+Slow and janky
 ```
 
-**With async/await (modern style)**:
+**With Virtual DOM** (fast):
 
-```tsx
-async function fetchNotes() {
-  try {
-    const response = await fetch("https://api.example.com/notes");
-    const data = await response.json();
-    setNotes(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
+```
+State changes
+  ↓
+React creates new Virtual DOM (just JavaScript objects)
+  ↓
+React compares old vs new Virtual DOM (diffing)
+  ↓
+React calculates minimal changes needed
+  ↓
+React updates only changed parts of real DOM
+  ↓
+Fast and smooth
 ```
 
-**Why async/await is better**:
+**Example**:
 
-- Reads like synchronous code (top to bottom)
-- Easier error handling with try/catch
-- Less nested callbacks (no "callback hell")
-- Can use normal control flow (if, loops, etc.)
-
-### Q12: Why can't I use async directly in useEffect?
-
-**Answer**:
-
-**This doesn't work**:
-
-```tsx
-// ❌ Wrong - useEffect callback can't be async
-useEffect(async () => {
-  const data = await fetchNotes();
-  setNotes(data);
-}, []);
-```
-
-**Why it fails**:
-
-- useEffect expects either nothing or a cleanup function returned
-- Async functions always return a Promise
-- React doesn't know how to handle a Promise as cleanup
-
-**This works**:
-
-```tsx
-// ✅ Correct - define async function inside, then call it
-useEffect(() => {
-  const loadNotes = async () => {
-    const data = await fetchNotes();
-    setNotes(data);
-  };
-
-  loadNotes();
-}, []);
-```
-
-**Pattern**:
-
-1. Define async function inside useEffect
-2. Call it immediately
-3. useEffect callback itself is not async
-
-### Q13: Why do we separate API calls into a service layer?
-
-**Answer**:
-
-**Without service layer** (API calls in components):
-
-```tsx
-// Home.tsx
-const response = await fetch("https://api.example.com/notes");
-const notes = await response.json();
-
-// AddNote.tsx
-const response = await fetch("https://api.example.com/notes", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(note),
-});
-```
-
-**Problems**:
-
-- **Duplication**: Same fetch logic in multiple places
-- **Hard to change**: Update API URL → update many files
-- **Mixed concerns**: UI and API logic together
-- **Hard to test**: Can't test API logic separately
-
-**With service layer** (our approach):
-
-```tsx
-// notesService.ts - centralized API logic
-export const notesService = {
-  getAllNotes: async () => {
-    /* fetch logic */
-  },
-  addNote: async (note) => {
-    /* fetch logic */
-  },
-};
-
-// Components - just use the service
-const notes = await notesService.getAllNotes();
-await notesService.addNote(note);
-```
-
-**Benefits**:
-
-- **DRY**: Don't Repeat Yourself
-- **Easy to change**: Update API once
-- **Separation of concerns**: Components focus on UI
-- **Testable**: Test service independently
-- **Type safety**: Service defines interfaces
-
-### Q14: What does Omit<Note, "id"> mean?
-
-**Answer**:
-
-**`Omit<Type, Keys>`** is a TypeScript utility type.
-
-```tsx
-interface Note {
-  id: number;
-  title: string;
-  subheading: string;
-  content: string;
-}
-
-// Omit<Note, "id"> = Note without the id property
-type NoteWithoutId = {
-  title: string;
-  subheading: string;
-  content: string;
-};
-```
-
-**Why we use it**:
-
-```tsx
-// When adding a note, user provides everything except ID
-addNote(note: Omit<Note, "id">) => {
-  const newNote: Note = {
-    ...note,        // title, subheading, content from user
-    id: Date.now()  // we generate the ID
-  };
-}
-```
-
-**Benefits**:
-
-- **Type safety**: TypeScript prevents passing ID
-- **Clear intent**: Signature shows ID is generated
-- **No mistakes**: Can't accidentally include ID
-
-**Other TypeScript utilities**:
-
-- **`Pick<Note, "title" | "content">`**: Only those fields
-- **`Partial<Note>`**: All fields optional
-- **`Required<Note>`**: All fields required
+- You have 100 notes
+- You change title of 1 note
+- Without Virtual DOM: Re-render all 100 cards
+- With Virtual DOM: Only update 1 card
 
 ---
 
@@ -1509,60 +2217,49 @@ addNote(note: Omit<Note, "id">) => {
 
 ### 1. Component Organization
 
-- **Separate** components, pages, services, and context
+- **Separate** components, pages, and context
 - **Reusable** components (NoteCard used in Home)
-- **Single responsibility**: Each component/file has one job
-- **Service layer**: API logic isolated from UI
+- **Single responsibility**: Each component has one job
 
 ### 2. Type Safety
 
 - TypeScript interfaces for all data structures
 - Type-only imports for types
 - Prevents many bugs before runtime
-- `Omit` utility for partial types
 
 ### 3. State Management
 
-- **Local state** for form inputs and search
-- **Global state** for shared data (Context with API)
-- **Derived state**: Calculate filteredNotes instead of storing
-- **Loading states**: Show feedback during async operations
+- **Local state** for form inputs (AddNote, EditNote)
+- **Global state** for shared data (Context)
+- **Derived state**: Calculate values instead of storing them
 
-### 4. Async Best Practices
+### 4. Immutability
 
-- Service layer for all API calls
-- Proper error handling with try/catch
-- Loading states for better UX
-- Async functions in Context
+```tsx
+// ❌ Wrong - mutates original array
+notes.push(newNote);
+
+// ✅ Correct - creates new array
+setNotes([newNote, ...notes]);
+```
 
 ### 5. Error Handling
 
-- Try/catch for all API calls
-- User-friendly error messages
 - Check if note exists before rendering
 - Redirect if note not found
 - Confirmation before deleting
 
-### 6. Code Reusability
-
-- Single NotePage for add/edit/view
-- Service layer reused across context
-- Custom hooks (useNotes, useTheme)
-- Shared components (NoteCard)
-
-### 7. Accessibility
+### 6. Accessibility
 
 - Semantic HTML (`<nav>`, `<button>`, etc.)
 - ARIA attributes (`aria-label`, `role`)
 - Proper form labels with `htmlFor`
-- Loading indicators with screen reader text
 
-### 8. Responsive Design
+### 7. Responsive Design
 
 - Bootstrap grid system
 - Mobile-first approach
 - Collapsible navbar for mobile
-- Responsive search input
 
 ---
 
@@ -1570,125 +2267,47 @@ addNote(note: Omit<Note, "id">) => {
 
 ### Immediate Improvements You Could Make
 
-1. **Persistence**: Already using REST API! ✅
-
-2. **Search**: Already implemented! ✅
-
-3. **Delete via API**: Add delete endpoint
+1. **Persistence**: Save notes to localStorage
 
 ```tsx
-// In notesService.ts
-deleteNote: async (id: number): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/delete-note/${id}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) throw new Error("Delete failed");
-};
-
-// In NotesContext.tsx
-const deleteNote = async (id: number) => {
-  try {
-    await notesService.deleteNote(id);
-    setNotes(notes.filter((note) => note.id !== id));
-  } catch (error) {
-    console.error("Failed to delete note:", error);
-    throw error;
-  }
-};
+useEffect(() => {
+  localStorage.setItem("notes", JSON.stringify(notes));
+}, [notes]);
 ```
 
-4. **Optimistic updates**: Update UI before API responds
+2. **Search**: Filter notes by title
 
 ```tsx
-const addNote = async (note: Omit<Note, "id">) => {
-  const newNote: Note = { ...note, id: Date.now() };
-
-  // Update UI immediately
-  setNotes([newNote, ...notes]);
-
-  try {
-    await notesService.addNote(newNote);
-  } catch (error) {
-    // Revert if API fails
-    setNotes(notes.filter((n) => n.id !== newNote.id));
-    throw error;
-  }
-};
+const [search, setSearch] = useState("");
+const filtered = notes.filter((note) =>
+  note.title.toLowerCase().includes(search.toLowerCase())
+);
 ```
 
-5. **Date stamps**: Add created/updated dates
+3. **Sorting**: Sort by date or title
+
+```tsx
+const sorted = [...notes].sort((a, b) => a.title.localeCompare(b.title));
+```
+
+4. **Date stamps**: Add created/updated dates
 
 ```tsx
 interface Note {
-  id: number;
-  title: string;
-  subheading: string;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
+  // ...
+  createdAt: Date;
+  updatedAt: Date;
 }
-```
-
-6. **Sorting**: Sort by date or title
-
-```tsx
-const [sortBy, setSortBy] = useState("date");
-const sorted = [...filteredNotes].sort((a, b) =>
-  sortBy === "date" ? b.id - a.id : a.title.localeCompare(b.title)
-);
 ```
 
 ### Advanced Topics to Explore
 
-1. **Environment variables**: Store API URL in .env file
-
-```
-VITE_API_BASE_URL=https://notes-app.free.beeceptor.com
-```
-
-2. **React Query**: Better API state management
-
-```tsx
-const { data: notes, isLoading } = useQuery("notes", notesService.getAllNotes);
-```
-
-3. **Debouncing**: Optimize search performance
-
-```tsx
-const debouncedSearch = useDebounce(searchQuery, 300);
-```
-
-4. **Loading skeletons**: Better loading UX
-
-```tsx
-{
-  loading ? <NoteSkeleton count={6} /> : <NotesGrid />;
-}
-```
-
-5. **Error boundaries**: Catch component errors
-
-```tsx
-<ErrorBoundary fallback={<ErrorPage />}>
-  <App />
-</ErrorBoundary>
-```
-
-6. **Testing**: Jest and React Testing Library
-
-```tsx
-test("renders notes after loading", async () => {
-  render(<Home />);
-  expect(screen.getByText("Loading...")).toBeInTheDocument();
-  await waitFor(() => {
-    expect(screen.getByText("My First Note")).toBeInTheDocument();
-  });
-});
-```
-
-7. **Authentication**: Protect notes with user accounts
-
-8. **Real backend**: Build your own API with Node.js/Express
+1. **Custom Hooks**: Extract reusable logic
+2. **useReducer**: Complex state management
+3. **React Query**: Server state management
+4. **Testing**: Jest and React Testing Library
+5. **Performance**: useMemo, useCallback, React.memo
+6. **Backend**: Connect to real API
 
 ---
 
@@ -1703,19 +2322,12 @@ This Notes App teaches you:
 5. ✅ **Forms**: Controlled inputs, validation, submission
 6. ✅ **TypeScript**: Type safety and interfaces
 7. ✅ **Bootstrap**: Responsive styling without custom CSS
-8. ✅ **REST API**: Fetch data from server, HTTP methods
-9. ✅ **Async JavaScript**: Promises, async/await, error handling
-10. ✅ **Service Layer**: Separation of concerns, reusable API logic
-11. ✅ **Loading States**: Better UX during async operations
-12. ✅ **Search/Filter**: Client-side data filtering
-13. ✅ **Component Composition**: One component, multiple modes
-14. ✅ **Project Structure**: Organized, maintainable code
+8. ✅ **Project Structure**: Organized, maintainable code
 
 **Key Takeaway**: React makes building interactive UIs easier by:
 
 - Breaking UI into reusable components
 - Automatically updating UI when data changes
 - Providing patterns for managing state and side effects
-- Integrating seamlessly with REST APIs for data persistence
 
 Keep building, keep learning!
